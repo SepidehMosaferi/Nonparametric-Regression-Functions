@@ -1,4 +1,4 @@
-This repository contains all the R code for the paper titled "Nonparametric Cointegrating Regression Functions with Endogeneity and Semi-Long Memory" by Sepideh Mosaferi and Mark S Kaiser
+This repository contains all the code for the paper titled "Nonparametric Cointegrating Regression Functions with Endogeneity and Semi-Long Memory" by Sepideh Mosaferi and Mark S Kaiser
 
 The repository is structured as follows:
 
@@ -6,4 +6,4 @@ The repository is structured as follows:
 
 * The folder "application" contains all the code related to the application part of the paper.
 
-* The folder "simulation regression function" \& "simulation test statistic" contain all the code for simulations used in the paper.
+* The folders "simulation regression function" \& "simulation test statistic" contain all the code for simulations used in the paper.
