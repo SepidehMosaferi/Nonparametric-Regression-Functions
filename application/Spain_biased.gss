@@ -1,0 +1,137 @@
+// Title: Application code for the regression function (straight line): Spain-- biased case
+// Author: Sepideh Mosaferi
+// Date: Oct 2024
+
+new;
+library pgraph;
+pqgwin many; 
+
+// test statistic [Analytical form for Integral]
+proc ( 1 ) = MHMtest(y,x,h);
+    local n,arg,ker,xmat,theta,gxtheta,z2,T_N;
+    n = rows(y);   
+    arg = (x*ones(1,n)-ones(n,1)*x')/h;
+    ker = h*gauss(arg/2); 
+    xmat = zeros(n, 2);
+    xmat[.,1]=ones(n,1);
+    xmat[.,2]=x;
+    theta=pinv(xmat'*xmat)*xmat'*y;
+    gxtheta = theta[1]+theta[2]*x;    @g_hat@
+    z2 = (y-gxtheta)*(y-gxtheta)';  
+    T_N = sumc(sumc(ker.*z2));
+    retp(T_N); 
+endp; 
+
+
+// outputs are residual hats.
+proc ( 1 ) = reshat(y,x);
+    local n,xmat,theta,gxtheta,res_hat;
+    n = rows(x);
+    xmat = zeros(n, 2);
+    xmat[.,1]=ones(n,1);
+    xmat[.,2]=x;
+    theta=pinv(xmat'*xmat)*xmat'*y;
+    gxtheta = theta[1]+theta[2]*x;    @g_hat@
+    res_hat = y-gxtheta;  @residuals@
+    retp(res_hat);
+endp;
+    
+// test statistic for subsamples
+proc ( 1 ) = MHMtest_subsamples(res,x,h);
+    local n,arg,ker,z2,T_N;
+    n = rows(x);   
+    arg = (x*ones(1,n)-ones(n,1)*x')/h;
+    ker = h*gauss(arg/2); 
+    z2 = res*res';  
+    T_N = sumc(sumc(ker.*z2));
+    retp(T_N); 
+endp;  
+
+fn gauss(r) = 1/(2*sqrt(pi)).*exp(-r^2); 
+
+// read data
+load DATA[59,2]= "/Users/sepidehmosaferi/Desktop/Spain.txt";
+
+// sample size
+N = rows(DATA);
+
+@ value of d @ 
+d_SPAx = 1.079;           
+
+@ value of lambda @ 
+lambda_SPAx = 0.138;
+
+// h_N and h_b should be based on Cross Validation.
+
+h_N = 0.1512605;
+d_N = sqrt(N)/(lambda_SPAx^d_SPAx);
+tauN = N*h_N/d_N;
+
+h_b = 0.1512605;
+
+// MHM test: straight line test
+Test_all = (1/tauN) * MHMtest(DATA[.,1],DATA[.,2],h_N); 
+
+block = seqa(2, 1, N-2);
+pvalue_block = zeros(N-2,1);
+
+// subsampling process: it could be from 2 till N-1!
+k=1;
+do until k>N-2;
+    
+    // subDATA for block
+    numblock = N-block[k]+1;
+    subDATA = areshape(0,numblock|block[k]|2);
+    j = 1;
+    do until j > numblock;
+        subDATA[j,.,.] = DATA[j:(j+block[k]-1),.];
+        j = j+1;
+    endo;
+    
+    // residuals
+    res_subData = areshape(0,numblock|block[k]|1);
+    l = 1;
+    do until l > numblock;
+        res_subData[l,.,.] = reshat(arraytomat(subDATA[l,.,2]),arraytomat(subDATA[l,.,1]));
+        l = l+1;
+    endo;
+    
+    // adjusting
+    subDATA_new = areshape(0,numblock|block[k]|2);
+    subDATA_new[1,.,1] = subDATA[1,.,1];
+    subDATA_new[1,.,2] = res_subData[1,.,.];
+    j = 2;
+    do until j > numblock;
+        subDATA_new[j,.,1] =subDATA[j,.,1]-subDATA[(j-1),1,1]; @regressor@
+        subDATA_new[j,.,2]=res_subData[j,.,.]; @residual@
+        j = j+1;
+    endo;
+    
+    sub_TN = zeros(numblock,1);
+     l = 1;
+     do until l > numblock;
+         sub_TN[l,1] = MHMtest_subsamples(arraytomat(subDATA_new[l,.,2]),arraytomat(subDATA_new[l,.,1]),h_b); 
+         l = l+1;
+     endo;
+     
+     d_b = sqrt(block[k])/(lambda_SPAx^d_SPAx);
+     tau_b = block[k]*h_b/d_b;
+      
+     {sub_Test} = sub_TN * (1/tau_b);   
+      
+     // indicator for p-value for block  
+     Ind_accept = zeros(numblock,1);
+      z=1;
+      do until z > numblock;  
+          Ind_accept[z] = Test_all <= sub_Test[z];  @ acceptance indicator @
+          z = z+1;
+      endo;
+      
+      // p-value    
+      pvalue_block[k] = meanc(Ind_accept);
+    
+      k = k+1;
+endo;
+
+// writing the results
+Result = block~pvalue_block;

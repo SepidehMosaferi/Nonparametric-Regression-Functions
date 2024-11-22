@@ -1,0 +1,216 @@
+// Title: Monte Carlo Density for Linear Test Statistic Form with Endogeneity and Semi-Long Memory 
+// Author: Sepideh Mosaferi
+// Date: Oct 2024
+
+new;
+library pgraph;
+pqgwin many;
+
+// test statistic [Analytical form for Integral: linear form]
+proc ( 1 ) = MHMtest(y,x,hpower);
+    local n,gam,arg,ker,xmat,theta,gxtheta,z2,T_N;
+    n = rows(y); 
+    gam = 1/(n^hpower);    
+    arg = (x*ones(1,n)-ones(n,1)*x')/gam;
+    ker = gam*gauss(arg/2); 
+    xmat = zeros(n, 2);
+    xmat[.,1]=ones(n,1);
+    xmat[.,2]=x;
+    theta=pinv(xmat'*xmat)*xmat'*y;
+    gxtheta = theta[1]+theta[2]*x; 
+    z2 = (y-gxtheta)*(y-gxtheta)';  
+    T_N = sumc(sumc(ker.*z2));
+    retp(T_N); 
+endp;  
+
+fn gauss(r) = 1/(2*sqrt(pi)).*exp(-r^2);
+
+
+// proc to generate semi-long memory data by looping 
+proc dsimtemp(u,d,delta);
+/*
+** simulate I(d) data
+** input  = u
+** output = (I-e^(-lambda_N)*L)^-d u; lambda_N=1/N^delta
+*/
+local nn,y,b0,k,b,ur,temp;
+nn= rows(u);
+b = zeros(nn,1);
+y = zeros(nn,1);
+temp = exp(-1/nn^delta);    
+b0=1;          
+k =1;
+do until k>nn;
+   if k==1;
+      b[k]=temp*d;
+   else;   
+      b[k]=temp*(k+d-1)*b[k-1]/k;
+   endif;
+   k = k+1;
+endo;  
+b=b0|b;
+k =1;
+do until k>nn;
+   ur   = rev(u[1:k]);   
+   y[k] = b[1:k]'ur;
+   k = k+1;
+endo;   
+retp(y);
+endp;
+
+
+/* main program   */
+ library gauss, pgraph;
+ pqgwin many;
+   
+   seed1  = 78912342;
+   iter   = 2000;             @ # iterations  @
+   numh   = {50, 100, 500}; @ sample size selections @
+      
+d01 = 0.1; @ value of d @
+d02 = 0.2;
+d03 = 0.3; 
+d04 = 0.4;
+d05 = 0.5;
+d1 = 1;
+d15 = 1.5;
+
+aa     = 0.25; 	       @ AR coefficient for equation error AR model @
+rho    = 0.5;            @ correlation between ux and uy for endogeneity @ 
+b  = 1;                @ regression coefficient @	
+sig = 0.2;             @ error standard deviation @
+   
+hpower  = 1/3;   @ value of bandwidth @
+   
+delta = 1/5;   @ value of tempering @
+
+// sample size selection  
+nn = numh[3]; 
+
+// saving results
+Dist_d01 = zeros(iter,1);
+Dist_d02 = zeros(iter,1);
+Dist_d03 = zeros(iter,1);
+Dist_d04 = zeros(iter,1);
+Dist_d05 = zeros(iter,1);
+Dist_d1 = zeros(iter,1);
+Dist_d15 = zeros(iter,1);
+  
+  k = 1;
+  do until k > iter;            @ loop for simulation @
+      
+      ux  = rndns(nn,1,seed1);    // regressor error 
+      uy  = rndns(nn,1,seed1);           // equation error
+      ux  = ((1-rho^2)^0.5) *ux + rho*uy;  // endogeneity correlation = rho 
+      uy  = recserar(uy,uy[1],aa);  @ converts equation error to AR(1) errors @
+      
+      uxtempd01 = dsimtemp(ux,d01,delta);  // generate semi-long memory inputs for regressor 
+      uxtempd02 = dsimtemp(ux,d02,delta);      
+      uxtempd03 = dsimtemp(ux,d03,delta);   
+      uxtempd04 = dsimtemp(ux,d04,delta);  
+      uxtempd05 = dsimtemp(ux,d05,delta);  
+      uxtempd1 = dsimtemp(ux,d1,delta);  
+      uxtempd15 = dsimtemp(ux,d15,delta);  
+      
+      // x and y
+      xtempd01   = recserar(uxtempd01,uxtempd01[1],1);  // regressor is partial sum of semi-long memory inputs 
+      fxtempd01 = xtempd01;
+      ytempd01 = b*fxtempd01 + sig*uy;                // cointegrated regression equation 
+      
+      xtempd02   = recserar(uxtempd02,uxtempd02[1],1);  
+      fxtempd02 = xtempd02;
+      ytempd02 = b*fxtempd02 + sig*uy;                 
+
+      xtempd03   = recserar(uxtempd03,uxtempd03[1],1);  
+      fxtempd03 = xtempd03;
+      ytempd03 = b*fxtempd03 + sig*uy;               
+
+      xtempd04   = recserar(uxtempd04,uxtempd04[1],1);  
+      fxtempd04 = xtempd04;
+      ytempd04 = b*fxtempd04 + sig*uy; 
+
+      xtempd05   = recserar(uxtempd05,uxtempd05[1],1);  
+      fxtempd05 = xtempd05;
+      ytempd05 = b*fxtempd05 + sig*uy;  
+      
+      xtempd1   = recserar(uxtempd1,uxtempd1[1],1);  
+      fxtempd1 = xtempd1;
+      ytempd1 = b*fxtempd1 + sig*uy;
+      
+      xtempd15   = recserar(uxtempd15,uxtempd15[1],1);  
+      fxtempd15 = xtempd15;
+      ytempd15 = b*fxtempd15 + sig*uy;
+          
+      // coefficients of test statistic
+      h_N = nn^(-hpower);
+      
+      d_Nd01 = nn^(0.5+d01*delta);
+      d_Nd02 = nn^(0.5+d02*delta);
+      d_Nd03 = nn^(0.5+d03*delta);
+      d_Nd04 = nn^(0.5+d04*delta);
+      d_Nd05 = nn^(0.5+d05*delta);
+      d_Nd1 = nn^(0.5+d1*delta);
+      d_Nd15 = nn^(0.5+d15*delta);
+      
+      tauNd01 = nn*h_N/d_Nd01;
+      tauNd02 = nn*h_N/d_Nd02;
+      tauNd03 = nn*h_N/d_Nd03;
+      tauNd04 = nn*h_N/d_Nd04;
+      tauNd05 = nn*h_N/d_Nd05;
+      tauNd1 = nn*h_N/d_Nd1;
+      tauNd15 = nn*h_N/d_Nd15;
+ 
+      // test statistic  
+      TN_d01 = MHMtest(ytempd01,xtempd01,hpower);
+      Test_d01 = (1/tauNd01) * TN_d01; 
+      
+      TN_d02 = MHMtest(ytempd02,xtempd02,hpower);
+      Test_d02 = (1/tauNd02) * TN_d02;
+      
+      TN_d03 = MHMtest(ytempd03,xtempd03,hpower);
+      Test_d03 = (1/tauNd03) * TN_d03;
+      
+      TN_d04 = MHMtest(ytempd04,xtempd04,hpower);
+      Test_d04 = (1/tauNd04) * TN_d04;
+      
+      TN_d05 = MHMtest(ytempd05,xtempd05,hpower);
+      Test_d05 = (1/tauNd05) * TN_d05;
+      
+      TN_d1 = MHMtest(ytempd1,xtempd1,hpower);
+      Test_d1 = (1/tauNd1) * TN_d1;
+      
+      TN_d15 = MHMtest(ytempd15,xtempd15,hpower);
+      Test_d15 = (1/tauNd15) * TN_d15;
+      
+      // loop results
+      Dist_d01[k,.] = Test_d01;
+      Dist_d02[k,.] = Test_d02;
+      Dist_d03[k,.] = Test_d03;
+      Dist_d04[k,.] = Test_d04;
+      Dist_d05[k,.] = Test_d05;
+      Dist_d1[k,.] = Test_d1;
+      Dist_d15[k,.] = Test_d15;
+      
+      k = k+1;
+  endo;
+  
+  // results
+  Dist_d01 = packr(Dist_d01);
+  Dist_d02 = packr(Dist_d02);
+  Dist_d03 = packr(Dist_d03);
+  Dist_d04 = packr(Dist_d04);  
+  Dist_d05 = packr(Dist_d05);
+  Dist_d1 = packr(Dist_d1);
+  Dist_d15 = packr(Dist_d15); 
+
+// writing the results
+Result = Dist_d01~Dist_d02~Dist_d03~Dist_d04~Dist_d05~Dist_d1~Dist_d15;
+  
+/*
+Save the results 
+*/
+   
+Output file = "/Users/sepidehmosaferi/Desktop/Result.txt" ON; /* this opens the text file to store the results */
+Result;
+Output off; /* this closes the text file to store the results */    
+ 

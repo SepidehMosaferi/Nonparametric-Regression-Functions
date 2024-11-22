@@ -1,0 +1,51 @@
+// Mean-Test code for UK
+
+block = seqa(2, 1, N-2);
+Mean_Test = zeros(N-2,1);
+
+k=1;
+do until k>N-2;
+    
+    // subDATA for block
+    numblock = N-block[k]+1;
+    subDATA = areshape(0,numblock|block[k]|2);
+    j = 1;
+    do until j > numblock;
+        subDATA[j,.,.] = DATA[j:(j+block[k]-1),.];
+        j = j+1;
+    endo;
+    
+    // residuals
+    res_subData = areshape(0,numblock|block[k]|1);
+    l = 1;
+    do until l > numblock;
+        res_subData[l,.,.] = reshat(arraytomat(subDATA[l,.,2]),arraytomat(subDATA[l,.,1]));
+        l = l+1;
+    endo;
+    
+    // adjusting
+    subDATA_new = areshape(0,numblock|block[k]|2);
+    subDATA_new[1,.,1] = subDATA[1,.,1];
+    subDATA_new[1,.,2] = res_subData[1,.,.];
+    j = 2;
+    do until j > numblock;
+        subDATA_new[j,.,1] =subDATA[j,.,1]-subDATA[(j-1),1,1]; @regressor@
+        subDATA_new[j,.,2]=res_subData[j,.,.]; @residual@
+        j = j+1;
+    endo;
+    
+    sub_TN = zeros(numblock,1);
+     l = 1;
+     do until l > numblock;
+         sub_TN[l,1] = MHMtest_subsamples(arraytomat(subDATA_new[l,.,2]),arraytomat(subDATA_new[l,.,1]),h_b); 
+         l = l+1;
+     endo;
+     
+     d_b = sqrt(block[k])/(lambda_UKx^d_UKx);
+     tau_b = block[k]*h_b/d_b;
+      
+     {sub_Test} = sub_TN * (1/tau_b);   
+     Mean_Test[k] = meanc(sub_Test); //these are mean tests that should be used in the next regression
+    
+      k = k+1;
+endo;
