@@ -1,4 +1,5 @@
-This repository contains all the code for the paper titled "Nonparametric Cointegrating Regression Functions with Endogeneity and Semi-Long Memory" by Sepideh Mosaferi and Mark S Kaiser
+This repository contains all the code for the paper titled "Estimation and testing in cointegrating regression under
+semi-long memory".
 
 The repository is structured as follows:
 
